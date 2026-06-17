@@ -57,7 +57,7 @@ public final class Kdf {
     static {
         Map<String, EVP_KDF> kdfs = new HashMap<>();
         LibCtx.forEachKdf(confinedScopeKdf -> {
-            if (confinedScopeKdf.providerName().equals("fips")) {
+            if (confinedScopeKdf.providerName().equals(LibCtx.getFipsProviderName())) {
                 EVP_KDF kdf = confinedScopeKdf.upRef(OsslArena.global());
                 kdf.forEachName(name -> kdfs.put(name.toUpperCase(), kdf));
             }
@@ -84,8 +84,11 @@ public final class Kdf {
             OSSL_PARAM saltParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_SALT, salt);
             OSSL_PARAM iterParam = OSSL_PARAM.ofUnsigned(EVP_KDF.KDF_PARAM_ITER, iter);
             OSSL_PARAM dgstParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_DIGEST, md.getAlg());
+            // OpenSSL's FIPS provider defaults PBKDF2 pkcs5 mode to 0, which applies SP800-132 lower-bound checks.
+            // Set it explicitly so providers with a different default enforce the same FIPS policy.
+            OSSL_PARAM pkcs5Param = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PKCS5, 0);
 
-            kdfCtx.derive(key, passParam, saltParam, iterParam, dgstParam);
+            kdfCtx.derive(key, passParam, saltParam, iterParam, dgstParam, pkcs5Param);
             return key;
         } catch (OpenSslException e) {
             throw new InvalidAlgorithmParameterException("Failed to derive key using PBKDF2", e);

@@ -50,7 +50,7 @@ for more information.
 
 Configures Jipher to load the instance of the OpenSSL cryptographic library and FIPS provider managed by the operating system.
 
-**Only** supported on Oracle Linux version 9.4 or later.
+**Only** supported on Oracle Linux version 9.4 or later and Microsoft Azure Linux version 3.0 or later.
 
 **Default value:** `false`
 

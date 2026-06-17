@@ -59,6 +59,7 @@ import com.oracle.jiphertest.testdata.TestData;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class EvpPkeyTest extends EvpTest {
@@ -123,13 +124,16 @@ public class EvpPkeyTest extends EvpTest {
 
     @Test
     public void description() {
-        String test = key.description();
-        assertEquals(KEY_DESCRIPTION, key.description());
+        if (!FipsProviderInfoUtil.isSymCryptProvider()) {
+            assertEquals(KEY_DESCRIPTION, key.description());
+        } else {
+            assertNull(key.description());
+        }
     }
 
     @Test
     public void providerName() {
-        assertEquals("fips", key.providerName());
+        assertEquals(LibCtx.getFipsProviderName(), key.providerName());
     }
 
     @Test
@@ -214,8 +218,7 @@ public class EvpPkeyTest extends EvpTest {
     public void todata() throws Exception {
         OsslParamBuffer params = key.todata(EVP_PKEY.Selection.PKEY_KEYPAIR, this.testArena);
         assertTrue(params.locate("d").isPresent());
-        BigInteger privateExponent = params.locate("d").get().bigIntegerValue();
-        assertEquals(keySpec.getPrivateExponent(), privateExponent);
+        assertPrivateExponentEquivalent(params.locate("d").get().bigIntegerValue());
     }
 
     @Test
@@ -395,5 +398,16 @@ public class EvpPkeyTest extends EvpTest {
             assertTrue(params2.locate(param.key).isPresent());
             assertEquals(params1.locate(param.key).get().intValue(), params1.locate(param.key).get().intValue());
         }
+    }
+
+    // RSA private exponents need not round-trip byte-for-byte. Any d satisfying e*d = 1 mod lcm(p-1, q-1)
+    // and matching the CRT exponents is mathematically equivalent for this key.
+    private void assertPrivateExponentEquivalent(BigInteger privateExponent) {
+        BigInteger pMinusOne = keySpec.getPrimeP().subtract(BigInteger.ONE);
+        BigInteger qMinusOne = keySpec.getPrimeQ().subtract(BigInteger.ONE);
+        BigInteger lambda = pMinusOne.divide(pMinusOne.gcd(qMinusOne)).multiply(qMinusOne);
+        assertEquals(BigInteger.ONE, keySpec.getPublicExponent().multiply(privateExponent).mod(lambda));
+        assertEquals(keySpec.getPrimeExponentP(), privateExponent.mod(pMinusOne));
+        assertEquals(keySpec.getPrimeExponentQ(), privateExponent.mod(qMinusOne));
     }
 }

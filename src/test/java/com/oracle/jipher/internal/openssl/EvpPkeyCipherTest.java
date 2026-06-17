@@ -50,6 +50,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.junit.Assume;
 import org.junit.Test;
 
 import com.oracle.jiphertest.testdata.AsymCipherTestVector;
@@ -139,7 +140,12 @@ public class EvpPkeyCipherTest extends EvpTest {
         OsslParamBuffer params = encryptorCtx.gettableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(RSA_ECB_OAEP_CIPHER_CTX_GETTABLE_PARAM_KEYS));
+        Set<String> expectedParamKeys = new HashSet<>(RSA_ECB_OAEP_CIPHER_CTX_GETTABLE_PARAM_KEYS);
+        if (FipsProviderInfoUtil.isSymCryptProvider()) {
+            expectedParamKeys.remove("tls-client-version");
+            expectedParamKeys.remove("tls-negotiated-version");
+        }
+        assertTrue(paramKeys.containsAll(expectedParamKeys));
     }
 
     @Test
@@ -147,7 +153,13 @@ public class EvpPkeyCipherTest extends EvpTest {
         OsslParamBuffer params = encryptorCtx.settableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(RSA_ECB_OAEP_CIPHER_CTX_SETTABLE_PARAM_KEYS));
+        Set<String> expectedParamKeys = new HashSet<>(RSA_ECB_OAEP_CIPHER_CTX_SETTABLE_PARAM_KEYS);
+        if (FipsProviderInfoUtil.isSymCryptProvider()) {
+            expectedParamKeys.remove("tls-client-version");
+            expectedParamKeys.remove("tls-negotiated-version");
+            expectedParamKeys.add("digest-props");
+        }
+        assertTrue(paramKeys.containsAll(expectedParamKeys));
     }
 
     @Test
@@ -172,7 +184,9 @@ public class EvpPkeyCipherTest extends EvpTest {
 
     @Test
     public void ctxSetParams() throws Exception {
-        String digest = EVP_MD.DIGEST_NAME_SHA2_256;
+        Assume.assumeTrue(FipsProviderInfoUtil.isRsaOaepMgf1DigestAllowedToDifferFromDigest());
+        String expectedDigest = EVP_MD.DIGEST_NAME_SHA2_256;
+        String digest = FipsProviderInfoUtil.getDigestName(expectedDigest);
         OsslParamBuffer digestParam = this.openSsl.dataParamBuffer(this.testArena, OSSL_PARAM.of("digest", digest));
         encryptorCtx.setParams(digestParam);
 
@@ -181,7 +195,7 @@ public class EvpPkeyCipherTest extends EvpTest {
                 OSSL_PARAM.of("digest", OSSL_PARAM.Type.UTF8_STRING, digest.getBytes(StandardCharsets.UTF_8).length + 1));
         encryptorCtx.getParams(digestParam);
         assertTrue(digestParam.locate("digest").isPresent());
-        assertEquals(digest, digestParam.locate("digest").get().stringValue());
+        assertEquals(expectedDigest, digestParam.locate("digest").get().stringValue());
     }
 
     @Test

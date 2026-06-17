@@ -126,7 +126,7 @@ public class EvpMdVectorTest extends EvpTest {
 
     @Test
     public void providerName() {
-        Assert.assertEquals("fips", md.providerName());
+        Assert.assertEquals(LibCtx.getFipsProviderName(), md.providerName());
     }
 
     @Test

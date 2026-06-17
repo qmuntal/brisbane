@@ -116,7 +116,7 @@ public class EvpMacVectorTest extends EvpTest {
     public void evpMacState() {
         assertTrue(mac.isA(EVP_MAC.MAC_NAME_HMAC));
         assertEquals(EVP_MAC.MAC_NAME_HMAC, mac.name());
-        assertEquals("fips", mac.providerName());
+        assertEquals(LibCtx.getFipsProviderName(), mac.providerName());
     }
 
     @Test

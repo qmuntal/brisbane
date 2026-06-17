@@ -90,10 +90,11 @@ public abstract class LinuxDistro {
      * @return the Linux distribution
      */
      static LinuxDistro getLinuxDistro(String id, String versionId) throws UnrecognisedLinuxDistroException {
-        if ("ol".equals(id)) {
-            if (versionId != null && versionId.matches("[0-9]+\\.[0-9]+(\\..*)?")) {
-                return new OracleLinux(versionId);
-            }
+        if ("ol".equals(id) && versionId != null && versionId.matches("[0-9]+\\.[0-9]+(\\..*)?")) {
+            return new OracleLinux(versionId);
+        }
+        if ("azurelinux".equals(id) && versionId != null && versionId.matches("[0-9]+\\.[0-9]+(\\..*)?")) {
+            return new AzureLinux(versionId);
         }
         throw new UnrecognisedLinuxDistroException("id=" + id + ", versionId=" + versionId);
      }
@@ -113,6 +114,7 @@ public abstract class LinuxDistro {
     abstract boolean providesFipsModule();
     abstract Path getCryptoLibPath();
     abstract Path getProviderSearchPath();
+    abstract String getFipsProviderName();
     abstract String getFipsModuleMac();
 
     // Fedora's modules are not submitted for FIPS validation, however several distributions downstream of Fedora
@@ -144,6 +146,11 @@ public abstract class LinuxDistro {
             // when loading the FIPS module.
             return null;
         }
+
+        @Override
+        String getFipsProviderName() {
+            return "fips";
+        }
     }
 
     static class OracleLinux extends FedoraLike {
@@ -160,6 +167,23 @@ public abstract class LinuxDistro {
         boolean providesFipsModule() {
             // A certified OpenSSL(3) FIPS module was first distributed in OL 9.4
             return (getMajorVersion() >= 10) || (getMajorVersion() == 9 && getMinorVersion() >= 4);
+        }
+    }
+
+    static class AzureLinux extends FedoraLike {
+
+        AzureLinux(String versionId) {
+            super("Microsoft Azure Linux", versionId);
+        }
+
+        @Override
+        boolean providesFipsModule() {
+            return getMajorVersion() >= 3;
+        }
+
+        @Override
+        String getFipsProviderName() {
+            return "symcryptprovider";
         }
     }
 }

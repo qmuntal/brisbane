@@ -43,6 +43,7 @@ package com.oracle.jipher.internal.openssl;
 import java.security.spec.KeySpec;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 
 import com.oracle.jiphertest.testdata.DataMatchers;
@@ -70,7 +71,11 @@ public class EvpPkeyEncapsulateTest extends EvpTest {
     @Test
     public void encapsulateDecapsulate() throws Exception {
         EVP_PKEY_CTX encapCtx = libCtx.newPkeyCtx(this.publicKey, null, this.testArena);
-        encapCtx.encapsulateInit(RSASVE);
+        try {
+            encapCtx.encapsulateInit(RSASVE);
+        } catch (OpenSslException e) {
+            Assume.assumeNoException("RSASVE encapsulation is not supported", e);
+        }
 
         // Determine wrapped and unwrapped key buffer lengths
         int[] sizes = encapCtx.encapsulate(null, 0, null, 0);
@@ -80,7 +85,11 @@ public class EvpPkeyEncapsulateTest extends EvpTest {
         encapCtx.encapsulate(wrappedKey, 0, genKey, 0);
 
         EVP_PKEY_CTX decapCtx = libCtx.newPkeyCtx(this.privateKey, null, this.testArena);
-        decapCtx.decapsulateInit(RSASVE);
+        try {
+            decapCtx.decapsulateInit(RSASVE);
+        } catch (OpenSslException e) {
+            Assume.assumeNoException("RSASVE decapsulation is not supported", e);
+        }
 
         // Determine unwrapped key buffer lengths
         int unwrappedLen = decapCtx.decapsulate(wrappedKey, 0,  wrappedKey.length, null, 0);

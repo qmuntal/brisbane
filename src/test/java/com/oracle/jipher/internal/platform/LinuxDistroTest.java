@@ -38,54 +38,48 @@
  * SOFTWARE.
  */
 
-package com.oracle.jipher.internal.spi;
+package com.oracle.jipher.internal.platform;
 
-import com.oracle.jipher.internal.openssl.FipsProviderInfo;
+import java.nio.file.Paths;
 
-/**
- * Utility class exposing the cryptographic capabilities of the underlying OpenSSL
- * FIPS provider.  The values are determined at class-initialisation time based on
- * the name and version of the OpenSSL FIPS provider loaded by Jipher at runtime.
- *
- * <p> The OpenSSL FIPS provider shipped with Linux distributions such as Oracle Linux
- * does not support certain legacy algorithms; these are reported as not
- * supported.
- */
-public class Capabilities {
+import org.junit.Assert;
+import org.junit.Test;
 
-    private static final boolean DESEDE_IS_SUPPORTED;
-    private static final boolean DSA_IS_SUPPORTED;
-    private static final boolean SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED;
+public class LinuxDistroTest {
 
-    // Initialise capability flags based on the OpenSSL FIPS provider name and version.
-    static {
-        String name = FipsProviderInfo.getNameString();
+    @Test
+    public void oracleLinuxDetected() throws Exception {
+        LinuxDistro linuxDistro = LinuxDistro.getLinuxDistro("ol", "9.4");
 
-        boolean isRHDerivative = (name != null) &&
-            (name.contains("Red Hat Enterprise Linux") || name.contains("Oracle Linux"));
-        boolean isSymCryptProvider = "symcryptprovider".equals(name);
-
-        if (isRHDerivative || isSymCryptProvider) {
-            // These OS-provided providers do not expose all algorithms that are present in the
-            // upstream OpenSSL FIPS provider, so Jipher must not register those services.
-            DESEDE_IS_SUPPORTED = false;
-            DSA_IS_SUPPORTED = false;
-            SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED = false;
-        } else {
-            DESEDE_IS_SUPPORTED = true;
-            DSA_IS_SUPPORTED = true;
-            SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED = true;
-        }
+        Assert.assertTrue(linuxDistro instanceof LinuxDistro.OracleLinux);
+        Assert.assertEquals("Oracle Linux 9.4", linuxDistro.toString());
+        Assert.assertTrue(linuxDistro.providesFipsModule());
     }
 
-    // The following getters facilitate mocking.
-    public static boolean isDESEDESupported() {
-        return DESEDE_IS_SUPPORTED;
+    @Test
+    public void azureLinuxDetected() throws Exception {
+        LinuxDistro linuxDistro = LinuxDistro.getLinuxDistro("azurelinux", "3.0");
+
+        Assert.assertTrue(linuxDistro instanceof LinuxDistro.AzureLinux);
+        Assert.assertEquals("Microsoft Azure Linux 3.0", linuxDistro.toString());
+        Assert.assertTrue(linuxDistro.providesFipsModule());
+        Assert.assertEquals("symcryptprovider", linuxDistro.getFipsProviderName());
+        Assert.assertEquals(Paths.get("/usr/lib64/libcrypto.so.3"), linuxDistro.getCryptoLibPath());
+        Assert.assertEquals(Paths.get("/usr/lib64/ossl-modules"), linuxDistro.getProviderSearchPath());
+        Assert.assertNull(linuxDistro.getFipsModuleMac());
     }
-    public static boolean isDSASupported() {
-        return DSA_IS_SUPPORTED;
+
+    @Test
+    public void olderAzureLinuxDoesNotProvideFipsModule() throws Exception {
+        LinuxDistro linuxDistro = LinuxDistro.getLinuxDistro("azurelinux", "2.0");
+
+        Assert.assertFalse(linuxDistro.providesFipsModule());
+        Assert.assertNull(linuxDistro.getCryptoLibPath());
+        Assert.assertNull(linuxDistro.getProviderSearchPath());
     }
-    public static boolean isSHA1DigestSignatureSupported() {
-        return SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED;
+
+    @Test (expected = UnrecognisedLinuxDistroException.class)
+    public void invalidAzureLinuxVersionNeg() throws Exception {
+        LinuxDistro.getLinuxDistro("azurelinux", "3");
     }
 }

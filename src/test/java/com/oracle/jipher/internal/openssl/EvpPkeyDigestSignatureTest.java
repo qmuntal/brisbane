@@ -93,7 +93,9 @@ public class EvpPkeyDigestSignatureTest extends EvpTest {
         OsslParamBuffer params = signCtx.gettableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertEquals(EMPTY_SET, paramKeys);
+        Set<String> expectedParamKeys = FipsProviderInfoUtil.isSymCryptProvider() ?
+                Set.of("state") : EMPTY_SET;
+        assertEquals(expectedParamKeys, paramKeys);
     }
 
     @Test
@@ -101,7 +103,9 @@ public class EvpPkeyDigestSignatureTest extends EvpTest {
         OsslParamBuffer params = signCtx.settableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertEquals(EMPTY_SET, paramKeys);
+        Set<String> expectedParamKeys = FipsProviderInfoUtil.isSymCryptProvider() ?
+                Set.of("recompute_checksum", "state") : EMPTY_SET;
+        assertEquals(expectedParamKeys, paramKeys);
     }
 
     @Test

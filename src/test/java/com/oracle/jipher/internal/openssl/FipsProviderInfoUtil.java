@@ -50,6 +50,7 @@ public class FipsProviderInfoUtil {
     static private final boolean DSA_IS_SUPPORTED;
     static private final boolean SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED;
     static private final boolean FIPS_186_4_TYPE_DOMAIN_PARAMETERS_SUPPORTED;
+    static private final boolean RSA_OAEP_MGF1_DIGEST_ALLOWED_TO_DIFFER_FROM_DIGEST;
     static private final int     KDF_MIN_PWD_LENGTH;
 
     static {
@@ -58,6 +59,7 @@ public class FipsProviderInfoUtil {
 
         // Note: The OpenSSL FIPS provider used on version 9 of these Linux distributions is also used on version 10.
         boolean isRHDerivative = NAME.contains("Red Hat Enterprise Linux") || NAME.contains("Oracle Linux");
+        boolean isSymCryptProvider = "symcryptprovider".equals(NAME);
 
         if (isRHDerivative) {
             // Drop build number from version string
@@ -71,12 +73,21 @@ public class FipsProviderInfoUtil {
             DSA_IS_SUPPORTED = false;
             SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED = false;
             FIPS_186_4_TYPE_DOMAIN_PARAMETERS_SUPPORTED = false;
+            RSA_OAEP_MGF1_DIGEST_ALLOWED_TO_DIFFER_FROM_DIGEST = true;
             KDF_MIN_PWD_LENGTH = 8;
+        } else if (isSymCryptProvider) {
+            DESEDE_IS_SUPPORTED = false;
+            DSA_IS_SUPPORTED = false;
+            SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED = false;
+            FIPS_186_4_TYPE_DOMAIN_PARAMETERS_SUPPORTED = false;
+            RSA_OAEP_MGF1_DIGEST_ALLOWED_TO_DIFFER_FROM_DIGEST = false;
+            KDF_MIN_PWD_LENGTH = 0;
         } else {
             DESEDE_IS_SUPPORTED = true;
             DSA_IS_SUPPORTED = true;
             SHA1_DIGEST_SIGNATURES_ARE_SUPPORTED = true;
             FIPS_186_4_TYPE_DOMAIN_PARAMETERS_SUPPORTED = true;
+            RSA_OAEP_MGF1_DIGEST_ALLOWED_TO_DIFFER_FROM_DIGEST = true;
             KDF_MIN_PWD_LENGTH = 0;
         }
     }
@@ -101,6 +112,21 @@ public class FipsProviderInfoUtil {
 
     public static boolean isFIPS186_4TypeDomainParametersSupported() {
         return FIPS_186_4_TYPE_DOMAIN_PARAMETERS_SUPPORTED;
+    }
+
+    public static boolean isSymCryptProvider() {
+        return "symcryptprovider".equals(NAME);
+    }
+
+    public static boolean isRsaOaepMgf1DigestAllowedToDifferFromDigest() {
+        return RSA_OAEP_MGF1_DIGEST_ALLOWED_TO_DIFFER_FROM_DIGEST;
+    }
+
+    public static String getDigestName(String name) {
+        if (isSymCryptProvider() && name.startsWith("SHA2-")) {
+            return name.replace("SHA2-", "SHA-");
+        }
+        return name;
     }
 
     public static int getKDFMinPwdLen() {

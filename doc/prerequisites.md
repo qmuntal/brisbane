@@ -110,11 +110,14 @@ version 3.6.2 of the OpenSSL cryptographic library with version 3.5.4 of the Ope
 
 ### Using the instance provided by the operating system
 
-Currently, this option is only supported on Oracle Linux version 9.4 or later.
+Currently, this option is supported on Oracle Linux version 9.4 or later and Microsoft Azure Linux version 3.0 or later.
 
 Oracle Linux 9 and later provide an instance of the OpenSSL cryptographic library and FIPS provider.
 They are usually pre-installed but if necessary they can be added via the package manager by installing the packages
 `openssl-libs` and `openssl-fips-provider-so`.
+
+Microsoft Azure Linux 3 provides an instance of the OpenSSL cryptographic library and the SymCrypt OpenSSL provider,
+which is named `symcryptprovider`.
 
 To configure Jipher to use the OpenSSL instance provided by the operating system set the Java system property
 `jipher.openssl.useOsInstance` to `true`.  For example:
@@ -123,8 +126,7 @@ java -Djipher.openssl.useOsInstance=true --module-path <path to jipher-jce JAR> 
 ```
 
 Note: An OpenSSL configuration file containing the FIPS module MAC
-is not required when using the OpenSSL instance provided by Oracle Linux
-as the FIPS module MAC is embedded in the FIPS provider binary.
+is not required when using a supported OpenSSL instance provided by the operating system.
 
 ### Providing your own instance of OpenSSL
 

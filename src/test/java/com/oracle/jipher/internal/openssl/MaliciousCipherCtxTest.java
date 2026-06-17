@@ -43,6 +43,7 @@ package com.oracle.jipher.internal.openssl;
 import javax.crypto.BadPaddingException;
 import javax.crypto.ShortBufferException;
 
+import org.junit.Assume;
 import org.junit.Test;
 
 import static com.oracle.jipher.internal.openssl.EVP_CIPHER_CTX.Enc.DECRYPTION;
@@ -52,6 +53,7 @@ public class MaliciousCipherCtxTest {
     static final int BLOCK_SIZE = 16;
     static final byte[] KEY = new byte[BLOCK_SIZE * 2];
     static final byte[] IV = new byte[BLOCK_SIZE];
+    static final String AES_256_WRAP_PAD = "id-aes256-wrap-pad";
 
     @Test(expected = ShortBufferException.class)
     public void primeBlockSizeMinus1Update1() throws Exception {
@@ -181,6 +183,7 @@ public class MaliciousCipherCtxTest {
 
     @Test(expected = ShortBufferException.class)
     public void unwrapBlockSizeMinus1() throws Exception {
+        Assume.assumeTrue("AES-KWP with padding is not supported", isCipherSupported(AES_256_WRAP_PAD));
         // The 32-bit default ICV for KWP
         final byte[] icv2   = new byte[]{(byte) 0xA6, (byte) 0x59, (byte) 0x59, (byte) 0xA6};
         final int blkSz = 8;  // blkSz is 8 for AES Key Wrap
@@ -191,7 +194,7 @@ public class MaliciousCipherCtxTest {
 
         // Create an AES Wrap Pad cipher context
         com.oracle.jipher.internal.openssl.CipherCtx cipherCtx = new com.oracle.jipher.internal.openssl.CipherCtx();
-        cipherCtx.init("id-aes256-wrap-pad", true, true, KEY, icv2);
+        cipherCtx.init(AES_256_WRAP_PAD, true, true, KEY, icv2);
 
         // Use it to wrap blkSz - 1 bytes of plaintext.
         int offset = cipherCtx.update(plaintText, 0, plaintText.length, cipherText, 0);
@@ -202,9 +205,23 @@ public class MaliciousCipherCtxTest {
         // The provided buffer (which can only accommodate up to blkSz - 1 bytes) is too small to accommodate
         // the intermediate result output by OpenSSL (that includes the padding bytes).
         // Consequently, the update() call should fail.
-        cipherCtx.init("id-aes256-wrap-pad", true, false, KEY, icv2);
+        cipherCtx.init(AES_256_WRAP_PAD, true, false, KEY, icv2);
         offset = cipherCtx.update(cipherText, 0, cipherText.length, recoveredText, 0);
         cipherCtx.doFinal(recoveredText, offset);
+    }
+
+    private static boolean isCipherSupported(String cipherName) {
+        boolean[] supported = new boolean[1];
+        LibCtx.forEachCipher(cipher -> {
+            if (cipher.providerName().equals(LibCtx.getFipsProviderName())) {
+                cipher.forEachName(name -> {
+                    if (name.equalsIgnoreCase(cipherName)) {
+                        supported[0] = true;
+                    }
+                });
+            }
+        });
+        return supported[0];
     }
 
     @Test(expected = ShortBufferException.class)

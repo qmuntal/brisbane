@@ -116,6 +116,7 @@ public class EvpCipherVectorTest extends EvpTest {
         }
 
         Assume.assumeTrue(FipsProviderInfoUtil.isDESEDESupported() || !this.cipherName.contains("DESEDE"));
+        Assume.assumeTrue(isCipherSupported(this.alg));
     }
 
     static String getOpenSslName(String cipherName, String mode, SymCipherTestVector tv) {
@@ -129,6 +130,20 @@ public class EvpCipherVectorTest extends EvpTest {
 
     public static boolean isLegacy(String algorithm) {
         return algorithm.toUpperCase().contains("DES-EDE3");
+    }
+
+    static boolean isCipherSupported(String algorithm) {
+        boolean[] supported = new boolean[1];
+        LibCtx.forEachCipher(cipher -> {
+            if (cipher.providerName().equals(LibCtx.getFipsProviderName())) {
+                cipher.forEachName(name -> {
+                    if (name.equalsIgnoreCase(algorithm)) {
+                        supported[0] = true;
+                    }
+                });
+            }
+        });
+        return supported[0];
     }
 
     // The OpenSSL FIPS provider includes a few algorithms that are allowed by FIPS for legacy use ONLY.
@@ -191,6 +206,12 @@ public class EvpCipherVectorTest extends EvpTest {
 
     int getEvpCipherCtxIvLength() {
         if (mode.equals("ECB")) {
+            if (FipsProviderInfoUtil.isSymCryptProvider() && cipherName.equals("AES")) {
+                // SymCrypt reports the AES block size as the context IV length for ECB,
+                // even though ECB does not use an IV.
+                // See https://github.com/microsoft/SymCrypt-OpenSSL/issues/170.
+                return 16;
+            }
             // OpenSSL versions less than 3.0.2 contain a bug causing them to report
             // the iv length for 'DESede/ECB/...' Ciphers to be the block size (8)
             if (cipherName.equals("DESEDE") && fipsProviderVersion.compareTo(Version.of("3.0.2")) < 0) {
@@ -205,7 +226,7 @@ public class EvpCipherVectorTest extends EvpTest {
     public void evpCipherState() {
         assertTrue(cipher.isA(alg));
         assertEquals(alg, cipher.name());
-        assertEquals("fips", cipher.providerName());
+        assertEquals(LibCtx.getFipsProviderName(), cipher.providerName());
         int cipherBlockSize = cipherName.equals("AES") ? 16 : 8;
         int blockSize = (mode.equals("ECB") || mode.equals("CBC")) ? cipherBlockSize : 1;
         assertEquals(blockSize, cipher.blockSize());

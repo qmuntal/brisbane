@@ -130,7 +130,7 @@ public class EvpMdTest extends EvpTest {
 
     @Test
     public void providerName() {
-        assertEquals("fips", md.providerName());
+        assertEquals(LibCtx.getFipsProviderName(), md.providerName());
     }
 
     @Test
@@ -161,7 +161,9 @@ public class EvpMdTest extends EvpTest {
         OsslParamBuffer params = md.gettableCtxParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertEquals(EMPTY_SET, paramKeys);
+        Set<String> expectedParamKeys = FipsProviderInfoUtil.isSymCryptProvider() ?
+            Set.of("state") : EMPTY_SET;
+        assertEquals(expectedParamKeys, paramKeys);
     }
 
     @Test
@@ -169,7 +171,9 @@ public class EvpMdTest extends EvpTest {
         OsslParamBuffer params = md.settableCtxParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertEquals(EMPTY_SET, paramKeys);
+        Set<String> expectedParamKeys = FipsProviderInfoUtil.isSymCryptProvider() ?
+            Set.of("recompute_checksum", "state") : EMPTY_SET;
+        assertEquals(expectedParamKeys, paramKeys);
     }
 
     @Test
@@ -270,7 +274,9 @@ public class EvpMdTest extends EvpTest {
         OsslParamBuffer params = mdCtx.gettableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertEquals(EMPTY_SET, paramKeys);
+        Set<String> expectedParamKeys = FipsProviderInfoUtil.isSymCryptProvider() ?
+                Set.of("state") : EMPTY_SET;
+        assertEquals(expectedParamKeys, paramKeys);
     }
 
     @Test
@@ -278,7 +284,9 @@ public class EvpMdTest extends EvpTest {
         OsslParamBuffer params = mdCtx.settableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertEquals(EMPTY_SET, paramKeys);
+        Set<String> expectedParamKeys = FipsProviderInfoUtil.isSymCryptProvider() ?
+                Set.of("recompute_checksum", "state") : EMPTY_SET;
+        assertEquals(expectedParamKeys, paramKeys);
     }
 
     @Test
