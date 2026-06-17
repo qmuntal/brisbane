@@ -11,6 +11,7 @@ RUN tdnf install -y \
         msopenjdk-25 \
         openssl \
         tar \
+        awk \
     && tdnf clean all
 
 WORKDIR /workspaces/brisbane
