@@ -1,0 +1,30 @@
+{
+  "name": "Brisbane Azure Linux",
+  "build": {
+    "dockerfile": "Dockerfile.azl3",
+    "context": ".."
+  },
+  "containerEnv": {
+    "JAVA_HOME": "/usr/lib/jvm/msopenjdk-25",
+    "GRADLE_USER_HOME": "/root/.gradle"
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack"
+      ],
+      "settings": {
+        "java.jdt.ls.java.home": "/usr/lib/jvm/msopenjdk-25",
+        "java.configuration.runtimes": [
+          {
+            "name": "JavaSE-25",
+            "path": "/usr/lib/jvm/msopenjdk-25",
+            "default": true
+          }
+        ],
+        "java.import.gradle.java.home": "/usr/lib/jvm/msopenjdk-25"
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+FROM mcr.microsoft.com/azurelinux/base/core:3.0
+
+ENV JAVA_HOME=/usr/lib/jvm/msopenjdk-25
+ENV GRADLE_USER_HOME=/root/.gradle
+ENV PATH=/usr/lib/jvm/msopenjdk-25/bin:${PATH}
+
+RUN tdnf install -y \
+        bash \
+        ca-certificates \
+        git \
+        msopenjdk-25 \
+        openssl \
+    && tdnf clean all
+
+WORKDIR /workspaces/brisbane
