@@ -102,6 +102,11 @@ public class EvpPkeySignatureVectorTest extends EvpTest {
         this.signature = tv.getSignature();
 
         Assume.assumeTrue(FipsProviderInfoUtil.isDSASupported() || !this.alg.contains("withDSA"));
+        // SymCrypt before 103.9.1 hits https://github.com/microsoft/SymCrypt/issues/48:
+        // SymCryptRsaPkcs1Sign applies its ASN.1 short-form length limit even when
+        // SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1 is set, rejecting valid unhashed PKCS#1 v1.5
+        // messages longer than 128 bytes. Remove this skip once AZL3 ships SymCrypt 103.9.1 or later.
+        Assume.assumeTrue(!FipsProviderInfoUtil.isSymCryptProvider() || !"NONEwithRSA".equals(this.alg));
     }
 
     @Override

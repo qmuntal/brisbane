@@ -57,7 +57,7 @@ public abstract class MdCtx {
     static {
         Map<String, EVP_MD> mds = new HashMap<>();
         LibCtx.forEachMd((confinedScopeMd) -> {
-            if (confinedScopeMd.providerName().equals("fips")) {
+            if (confinedScopeMd.providerName().equals(LibCtx.getFipsProviderName())) {
                 EVP_MD md = confinedScopeMd.upRef(OsslArena.global());
                 md.forEachName(name -> mds.put(name.toUpperCase(), md));
             }

@@ -58,13 +58,13 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class EvpRandTest extends EvpTest {
-    // NIST SP-800-90A mandates that entropy shall not be provided by the consuming application.
-    // This test uses HASH_DRBG because, unlike CTR_DRBG, it supports reseeding by using the entropy as
-    // additional input in the seeding process.
-    static final String RAND_NAME = EVP_RAND.RAND_NAME_HASH_DRBG;
     static final String RAND_DESCRIPTION = null;
 
+    // Prefer HASH-DRBG because, unlike CTR-DRBG, it supports reseeding by using the entropy as additional input
+    // in the seeding process. Some providers only expose CTR-DRBG, and exercising the shared EVP_RAND paths is
+    // still valuable in that case.
     static final String HASH_DRBG_DIGEST_ALGORITHM = EVP_MD.DIGEST_NAME_SHA2_256;
+    static final Set<String> EMPTY_SET = Collections.<String>emptySet();
 
     // The following are the PARAM_KEYS in OpenSSL version 3.0.0. Later versions may support additional parameters
     static final Set<String> HASH_DRBG_GETTABLE_PARAM_KEYS = new HashSet<>(Arrays.asList("digest",
@@ -73,8 +73,9 @@ public class EvpRandTest extends EvpTest {
             "reseed_counter",  "reseed_requests", "reseed_time", "reseed_time_interval"));
     static final Set<String> HASH_DRBG_SETTABLE_PARAM_KEYS = new HashSet<>(Arrays.asList("digest",
             "properties", "reseed_requests", "reseed_time_interval"));
-
-    static final Set<String> EMPTY_SET = Collections.<String>emptySet();
+    static final Set<String> CTR_DRBG_GETTABLE_PARAM_KEYS = new HashSet<>(Arrays.asList(
+        "state", "strength", "max_request"));
+    static final Set<String> CTR_DRBG_SETTABLE_PARAM_KEYS = EMPTY_SET;
 
     static final int STRENGTH = 256;
     static final boolean PREDICTION_RESISTANCE = false;
@@ -85,20 +86,21 @@ public class EvpRandTest extends EvpTest {
     private String alg;
 
     private EVP_RAND rand;
-    private EVP_RAND_CTX parentRandCtx;
     private EVP_RAND_CTX randCtx;
 
     @Override
     public void setUp() throws Exception {
         super.setUp();
 
-        alg = RAND_NAME;
+        alg = getSupportedRandName();
         rand = libCtx.fetchRand(alg, null, testArena);
         randCtx = openSsl.newEvpRandCtx(rand, null, testArena);
 
-        OSSL_PARAM digestParam = OSSL_PARAM.of(EVP_RAND.DRBG_PARAM_DIGEST, HASH_DRBG_DIGEST_ALGORITHM);
-        OsslParamBuffer params = this.openSsl.dataParamBuffer(this.testArena, digestParam);
-        randCtx.setParams(params);
+        if (isHashDrbg()) {
+            OSSL_PARAM digestParam = OSSL_PARAM.of(EVP_RAND.DRBG_PARAM_DIGEST, HASH_DRBG_DIGEST_ALGORITHM);
+            OsslParamBuffer params = this.openSsl.dataParamBuffer(this.testArena, digestParam);
+            randCtx.setParams(params);
+        }
     }
 
 
@@ -114,7 +116,7 @@ public class EvpRandTest extends EvpTest {
 
     @Test
     public void forEachName() throws Exception {
-        rand.forEachName(name -> assertEquals(RAND_NAME, name));
+        rand.forEachName(name -> assertEquals(alg, name));
     }
 
     @Test
@@ -124,7 +126,7 @@ public class EvpRandTest extends EvpTest {
 
     @Test
     public void providerName() {
-        assertEquals("fips", rand.providerName());
+        assertEquals(LibCtx.getFipsProviderName(), rand.providerName());
     }
 
     @Test
@@ -152,7 +154,7 @@ public class EvpRandTest extends EvpTest {
         OsslParamBuffer params = rand.gettableCtxParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(HASH_DRBG_GETTABLE_PARAM_KEYS));
+        assertTrue(paramKeys.containsAll(getExpectedGettableCtxParamKeys()));
     }
 
     @Test
@@ -160,7 +162,7 @@ public class EvpRandTest extends EvpTest {
         OsslParamBuffer params = rand.settableCtxParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(HASH_DRBG_SETTABLE_PARAM_KEYS));
+        assertTrue(paramKeys.containsAll(getExpectedSettableCtxParamKeys()));
     }
 
     @Test
@@ -182,7 +184,7 @@ public class EvpRandTest extends EvpTest {
         OsslParamBuffer params = randCtx.gettableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(HASH_DRBG_GETTABLE_PARAM_KEYS));
+        assertTrue(paramKeys.containsAll(getExpectedGettableCtxParamKeys()));
     }
 
     @Test
@@ -190,17 +192,22 @@ public class EvpRandTest extends EvpTest {
         OsslParamBuffer params = randCtx.settableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(HASH_DRBG_SETTABLE_PARAM_KEYS));
+        assertTrue(paramKeys.containsAll(getExpectedSettableCtxParamKeys()));
     }
 
     @Test
-    public void getDigest() {
-        OSSL_PARAM digestParam = OSSL_PARAM.of(EVP_RAND.DRBG_PARAM_DIGEST, OSSL_PARAM.Type.UTF8_STRING, HASH_DRBG_DIGEST_ALGORITHM.getBytes(StandardCharsets.UTF_8).length + 1);
-        OsslParamBuffer paramValues = this.openSsl.templateParamBuffer(this.testArena, digestParam);
+    public void getAlgorithmSpecificParam() {
+        OSSL_PARAM param = isHashDrbg()
+                ? OSSL_PARAM.of(EVP_RAND.DRBG_PARAM_DIGEST, OSSL_PARAM.Type.UTF8_STRING, HASH_DRBG_DIGEST_ALGORITHM.getBytes(StandardCharsets.UTF_8).length + 1)
+                : OSSL_PARAM.of(EVP_RAND.RAND_PARAM_STATE, OSSL_PARAM.Type.INTEGER);
+        OsslParamBuffer paramValues = this.openSsl.templateParamBuffer(this.testArena, param);
 
         randCtx.getParams(paramValues);
-        String digestAlgorithm = paramValues.asArray()[0].stringValue();
-        assertEquals(HASH_DRBG_DIGEST_ALGORITHM, digestAlgorithm);
+        if (isHashDrbg()) {
+            assertEquals(HASH_DRBG_DIGEST_ALGORITHM, paramValues.asArray()[0].stringValue());
+        } else {
+            assertEquals(randCtx.state().ordinal(), paramValues.asArray()[0].intValue());
+        }
     }
 
     @Test
@@ -211,7 +218,7 @@ public class EvpRandTest extends EvpTest {
 
     @Test
     public void initialState() {
-        assertEquals(EVP_RAND_CTX.State.UNINITIALISED, randCtx.state());
+        assertEquals(getExpectedInitialState(), randCtx.state());
     }
 
     @Test
@@ -224,11 +231,41 @@ public class EvpRandTest extends EvpTest {
     public void instantiateUninstantiate() {
         randCtx.instantiate(STRENGTH, PREDICTION_RESISTANCE, PERSONALISATION_STRING);
         randCtx.uninstantiate();
-        assertEquals(EVP_RAND_CTX.State.UNINITIALISED, randCtx.state());
+        assertEquals(getExpectedInitialState(), randCtx.state());
     }
 
     void doInstantiate() {
         randCtx.instantiate(STRENGTH, PREDICTION_RESISTANCE, PERSONALISATION_STRING);
+    }
+
+    boolean isHashDrbg() {
+        return EVP_RAND.RAND_NAME_HASH_DRBG.equals(alg);
+    }
+
+    static String getSupportedRandName() {
+        for (String name : new String[] {EVP_RAND.RAND_NAME_HASH_DRBG, EVP_RAND.RAND_NAME_CTR_DRBG}) {
+            try {
+                EVP_RAND rand = LibCtx.getInstance().fetchRand(name, null);
+                if (rand.providerName().equals(LibCtx.getFipsProviderName())) {
+                    return name;
+                }
+            } catch (OpenSslException e) {
+                // Try the next RAND.
+            }
+        }
+        throw new AssertionError("No supported RAND found");
+    }
+
+    Set<String> getExpectedGettableCtxParamKeys() {
+        return isHashDrbg() ? HASH_DRBG_GETTABLE_PARAM_KEYS : CTR_DRBG_GETTABLE_PARAM_KEYS;
+    }
+
+    Set<String> getExpectedSettableCtxParamKeys() {
+        return isHashDrbg() ? HASH_DRBG_SETTABLE_PARAM_KEYS : CTR_DRBG_SETTABLE_PARAM_KEYS;
+    }
+
+    EVP_RAND_CTX.State getExpectedInitialState() {
+        return isHashDrbg() ? EVP_RAND_CTX.State.UNINITIALISED : EVP_RAND_CTX.State.READY;
     }
 
     @Test
@@ -261,8 +298,8 @@ public class EvpRandTest extends EvpTest {
     }
 
     @Test
-    public void generateUninitialized() {
-        assertEquals(EVP_RAND_CTX.State.UNINITIALISED, randCtx.state());
+    public void generateFromInitialState() {
+        assertEquals(getExpectedInitialState(), randCtx.state());
 
         byte[] randomBytes = new byte[1000];
         randCtx.generate(randomBytes, STRENGTH, PREDICTION_RESISTANCE, ADDITIONAL_INPUT);

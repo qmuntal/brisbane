@@ -42,7 +42,7 @@ If Jipher has been properly configured to locate its run time dependencies then
 the `runMainClass` task should produce output similar to the following:
 
 ```
-JipherJCE Provider <version>[OpenSSL <version> <date> with OpenSSL FIPS Provider version <version>] (implements <cryptographic algorithm list>)
+JipherJCE Provider <version>[OpenSSL <version> <date> with <FIPS provider name> version <version>] (implements <cryptographic algorithm list>)
 ```
 
 Troubleshooting:

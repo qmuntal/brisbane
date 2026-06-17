@@ -131,14 +131,29 @@ public final class OSSL_PARAM implements Destroyable {
         return new OSSL_PARAM(key, Type.UNSIGNED_INTEGER, bytes);
     }
     public static OSSL_PARAM ofUnsignedIntegerBytes(String key, byte[] data) {
-        return new OSSL_PARAM(key, Type.UNSIGNED_INTEGER, Objects.requireNonNull(data, "data must not be null"));
+        return new OSSL_PARAM(key, Type.UNSIGNED_INTEGER, stripRedundantLeadingZeroBytes(
+                Objects.requireNonNull(data, "data must not be null")));
     }
     public static OSSL_PARAM ofUnsigned(String key, BigInteger data) {
         if (data.signum() == -1) {
             throw new IllegalArgumentException("data parameter must not be negative");
         }
-        byte[] bytes = data.toByteArray();
+        byte[] bytes = stripRedundantLeadingZeroBytes(data.toByteArray());
         return new OSSL_PARAM(key, Type.UNSIGNED_INTEGER, bytes);
+    }
+
+    /**
+     * Removes sign-extension bytes from an unsigned integer encoding.
+     * BigInteger.toByteArray() returns a two's-complement representation, so positive values with the high bit set
+     * include a leading zero byte. OpenSSL treats UNSIGNED_INTEGER parameters as unsigned magnitudes, and some
+     * providers use the OSSL_PARAM data size when importing key material, so keep the encoding canonical.
+     */
+    private static byte[] stripRedundantLeadingZeroBytes(byte[] data) {
+        int index = 0;
+        while (index < data.length - 1 && data[index] == 0) {
+            index++;
+        }
+        return index == 0 ? data : Arrays.copyOfRange(data, index, data.length);
     }
 
     public static OSSL_PARAM of(String key, float data) {
@@ -190,6 +205,8 @@ public final class OSSL_PARAM implements Destroyable {
                 if (dataSize == 0L) {
                     throw new IllegalArgumentException("dataSize must be at least 1 for dataType %s, was %d".formatted(dataType, dataSize));
                 }
+                break;
+            case UTF8_PTR, OCTET_PTR:
                 break;
         }
         return new OSSL_PARAM(key, dataType, dataSize);

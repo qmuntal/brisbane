@@ -53,7 +53,7 @@ public abstract class MacCtx {
     static {
         Map<String, EVP_MAC> macs = new HashMap<>();
         LibCtx.forEachMac((confinedScopeMac) -> {
-            if (confinedScopeMac.providerName().equals("fips")) {
+            if (confinedScopeMac.providerName().equals(LibCtx.getFipsProviderName())) {
                 EVP_MAC mac = confinedScopeMac.upRef(OsslArena.global());
                 mac.forEachName(name -> macs.put(name.toUpperCase(), mac));
             }

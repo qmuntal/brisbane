@@ -59,7 +59,7 @@ it loads at run time:
 
 ```
 > java --enable-native-access=com.oracle.jipher --module-path <path to jipher JAR> -m com.oracle.jipher
-JipherJCE Provider <version>[OpenSSL <version> <date> with OpenSSL FIPS Provider version <version>] (implements AES, DESede, Diffie-Hellman, DSA, ECDSA, ECDH, HMAC, PBKDF2, RSA, SHA-1, SHA-2, SHA-3)
+JipherJCE Provider <version>[OpenSSL <version> <date> with <FIPS provider name> version <version>] (implements AES, DESede, Diffie-Hellman, DSA, ECDSA, ECDH, HMAC, PBKDF2, RSA, SHA-1, SHA-2, SHA-3)
 ```
 
 ## Provider Registration

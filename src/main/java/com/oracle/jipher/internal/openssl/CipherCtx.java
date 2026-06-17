@@ -63,7 +63,7 @@ public final class CipherCtx {
     static {
         Map<String, EVP_CIPHER> ciphers = new HashMap<>();
         LibCtx.forEachCipher((confinedScopeCipher) -> {
-            if (confinedScopeCipher.providerName().equals("fips")) {
+            if (confinedScopeCipher.providerName().equals(LibCtx.getFipsProviderName())) {
                 // The OpenSSL FIPS provider includes a few non-approved algorithms that are allowed for legacy usage.
                 // E.g. Triple DES ECB & CBC. These algorithms, provided by the OpenSSL FIPS provider,
                 // would not be returned by an algorithm fetch with a "fips=yes" property query.

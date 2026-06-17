@@ -156,7 +156,7 @@ public class EvpMacTest extends EvpTest {
 
     @Test
     public void providerName() {
-        assertEquals("fips", mac.providerName());
+        assertEquals(LibCtx.getFipsProviderName(), mac.providerName());
     }
 
     @Test
@@ -192,7 +192,11 @@ public class EvpMacTest extends EvpTest {
         OsslParamBuffer params = mac.settableCtxParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(HMAC_CTX_SETTABLE_PARAM_KEYS));
+        Set<String> expectedParamKeys = new HashSet<>(HMAC_CTX_SETTABLE_PARAM_KEYS);
+        if (FipsProviderInfoUtil.isSymCryptProvider()) {
+            expectedParamKeys.remove("tls-data-size");
+        }
+        assertTrue(paramKeys.containsAll(expectedParamKeys));
     }
 
     @Test
@@ -291,7 +295,11 @@ public class EvpMacTest extends EvpTest {
         OsslParamBuffer params = macCtx.settableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(HMAC_CTX_SETTABLE_PARAM_KEYS));
+        Set<String> expectedParamKeys = new HashSet<>(HMAC_CTX_SETTABLE_PARAM_KEYS);
+        if (FipsProviderInfoUtil.isSymCryptProvider()) {
+            expectedParamKeys.remove("tls-data-size");
+        }
+        assertTrue(paramKeys.containsAll(expectedParamKeys));
     }
 
     @Test
@@ -307,7 +315,11 @@ public class EvpMacTest extends EvpTest {
         OsslParamBuffer params = uninitialisedMacCtx.settableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(HMAC_CTX_SETTABLE_PARAM_KEYS));
+        Set<String> expectedParamKeys = new HashSet<>(HMAC_CTX_SETTABLE_PARAM_KEYS);
+        if (FipsProviderInfoUtil.isSymCryptProvider()) {
+            expectedParamKeys.remove("tls-data-size");
+        }
+        assertTrue(paramKeys.containsAll(expectedParamKeys));
     }
 
     @Test

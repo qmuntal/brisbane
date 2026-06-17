@@ -66,7 +66,7 @@ public final class LibCtx {
     static final String PROPERTY_QUERY_FIPS = "fips=yes";
     static final String PROPERTY_QUERY_NON_FIPS = "-fips";
 
-    static final private String FIPS_PROVIDER_NAME = "fips";
+    static final private String FIPS_PROVIDER_NAME = OsslLocator.getFipsProviderName();
     static final private String FIPS_PROVIDER_NAME_STRING;
     static final private String FIPS_PROVIDER_VERSION_STRING;
 
@@ -133,7 +133,7 @@ public final class LibCtx {
                 providers = provider_sect
 
                 [provider_sect]
-                fips = fips_sect
+                %3$s = fips_sect
 
                 [fips_sect]
                 activate = 1
@@ -177,7 +177,10 @@ public final class LibCtx {
                 ToolkitProperties.getFipsEnforcementValue() == Fips.EnforcementPolicy.FIPS_STRICT ? 1 : 0,
 
                 // %2$s
-                mac != null ? "module-mac = " + mac : ""
+                mac != null ? "module-mac = " + mac : "",
+
+                // %3$s
+                FIPS_PROVIDER_NAME
         ));
 
         if (!libCtx.isProviderAvailable(FIPS_PROVIDER_NAME)) {
@@ -202,23 +205,25 @@ public final class LibCtx {
         }
 
         try (OsslArena confinedArena = OsslArena.ofConfined()) {
-            // Verify that the library context doesn't provide a non-FIPS algorithm with a NULL property query string
-            try {
-                libCtx.fetchMd(A_NON_FIPS_MD_ALG, null, confinedArena);
-                return false;
-            } catch (OpenSslException e) {
-                // Expected failure - Do nothing.
+            if ("fips".equals(FIPS_PROVIDER_NAME)) {
+                // Verify that the library context doesn't provide a non-FIPS algorithm with a NULL property query string
+                try {
+                    libCtx.fetchMd(A_NON_FIPS_MD_ALG, null, confinedArena);
+                    return false;
+                } catch (OpenSslException e) {
+                    // Expected failure - Do nothing.
+                }
+
+                // Verify that the library context doesn't provide a non-FIPS algorithm with a '-fips' property query string
+                try {
+                    libCtx.fetchMd(A_NON_FIPS_MD_ALG, PROPERTY_QUERY_NON_FIPS, confinedArena);
+                    return false;
+                } catch (OpenSslException e) {
+                    // Expected failure - Do nothing.
+                }
             }
 
-            // Verify that the library context doesn't provide a non-FIPS algorithm with a '-fips' property query string
-            try {
-                libCtx.fetchMd(A_NON_FIPS_MD_ALG, PROPERTY_QUERY_NON_FIPS, confinedArena);
-                return false;
-            } catch (OpenSslException e) {
-                // Expected failure - Do nothing.
-            }
-
-            // Verify that the library context will provide a FIPS algorithm from the "fips" provider even with a NULL
+            // Verify that the library context will provide a FIPS algorithm from the FIPS provider even with a NULL
             // property query string (due to the default property query string being 'fips=yes')
             EVP_MD md = libCtx.fetchMd(A_FIPS_MD_ALG, null, confinedArena);
             if (!md.providerName().equals((FIPS_PROVIDER_NAME))) {
@@ -266,6 +271,10 @@ public final class LibCtx {
 
     public static String getFipsProviderNameString() {
         return FIPS_PROVIDER_NAME_STRING;
+    }
+
+    static String getFipsProviderName() {
+        return FIPS_PROVIDER_NAME;
     }
 
     public static String getFipsProviderVersionString() {

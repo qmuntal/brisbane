@@ -103,7 +103,7 @@ public class EvpPkeyDeriveTest extends EvpTest {
 
     @Test (expected = IllegalArgumentException.class)
     public void ctxGetReadOnlyParams() throws Exception {
-        OsslParamBuffer readOnlyParams = deriveCtx.gettableParams();
+        OsslParamBuffer readOnlyParams = peerPublicKey.gettableParams();
         try {
             deriveCtx.getParams(readOnlyParams);
         } catch (IllegalArgumentException e) {

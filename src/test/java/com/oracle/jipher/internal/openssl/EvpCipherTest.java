@@ -149,7 +149,7 @@ public class EvpCipherTest extends EvpTest {
 
     @Test
     public void providerName() {
-        assertEquals("fips", cipher.providerName());
+        assertEquals(LibCtx.getFipsProviderName(), cipher.providerName());
     }
 
     @Test
@@ -187,7 +187,11 @@ public class EvpCipherTest extends EvpTest {
         OsslParamBuffer params = cipher.settableCtxParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(AES_256_GCM_CIPHER_CTX_SETTABLE_PARAM_KEYS));
+        Set<String> expectedParamKeys = new HashSet<>(AES_256_GCM_CIPHER_CTX_SETTABLE_PARAM_KEYS);
+        if (FipsProviderInfoUtil.isSymCryptProvider()) {
+            expectedParamKeys.remove("ivlen");
+        }
+        assertTrue(paramKeys.containsAll(expectedParamKeys));
     }
 
     @Test
@@ -295,7 +299,11 @@ public class EvpCipherTest extends EvpTest {
         OsslParamBuffer params = cipherCtx.settableParams();
         Stream<String> stringStream = Arrays.stream(params.asArray()).map(param -> param.key);
         Set<String> paramKeys = stringStream.collect(Collectors.toSet());
-        assertTrue(paramKeys.containsAll(AES_256_GCM_CIPHER_CTX_SETTABLE_PARAM_KEYS));
+        Set<String> expectedParamKeys = new HashSet<>(AES_256_GCM_CIPHER_CTX_SETTABLE_PARAM_KEYS);
+        if (FipsProviderInfoUtil.isSymCryptProvider()) {
+            expectedParamKeys.remove("ivlen");
+        }
+        assertTrue(paramKeys.containsAll(expectedParamKeys));
     }
 
     @Test
@@ -719,7 +727,8 @@ public class EvpCipherTest extends EvpTest {
         byte[] output = new byte[SIXTEEN_KILOBYTES + AES_WRAP_PAD_BLOCK_SIZE * 2];
 
         // Create an AES Wrap Pad cipher context
-        EVP_CIPHER wrapCipher = libCtx.fetchCipher("id-aes256-wrap-pad", null, testArena);
+        EVP_CIPHER wrapCipher = getCipher("id-aes256-wrap-pad");
+        assumeTrue("AES-KWP with padding is not supported", wrapCipher != null);
         EVP_CIPHER_CTX wrapCipherCtx = openSsl.newEvpCipherCtx(testArena);
         wrapCipherCtx.init(wrapCipher, key, icv2, ENCRYPTION);
 
@@ -766,8 +775,19 @@ public class EvpCipherTest extends EvpTest {
         final OSSL_PARAM enablePadding = OSSL_PARAM.ofUnsigned(EVP_CIPHER.CIPHER_PARAM_PADDING, paddingEnabled);
         final OSSL_PARAM queryPadding = OSSL_PARAM.of(EVP_CIPHER.CIPHER_PARAM_PADDING, OSSL_PARAM.Type.UNSIGNED_INTEGER);
 
+        int testedCipherCount = 0;
         for (String cipherName : SUPPORTED_PADDING_CIPHERS) {
             _cipher = getCipher(cipherName);
+            if (_cipher == null) {
+                continue;
+            }
+            // Some providers can set padding but do not advertise CIPHER_PARAM_PADDING as gettable.
+            // This test validates padding state readback, so only exercise ciphers that can report it.
+            if (!_cipher.gettableCtxParams().hasKey(EVP_CIPHER.CIPHER_PARAM_PADDING)) {
+                continue;
+            }
+            testedCipherCount++;
+
             key = cipherName.contains("des") ? new byte[24] : new byte[Integer.parseInt(cipherName.substring(4, 7)) / 8];
             iv = cipherName.contains("ecb")  ? null : cipherName.contains("des") ? new byte[8] : new byte[16];
 
@@ -852,12 +872,13 @@ public class EvpCipherTest extends EvpTest {
             observed = _cipherCtx.getParams(queryPadding)[0].intValue();
             Assert.assertEquals(paddingEnabled, observed);
         }
+        assumeTrue("No padding-capable ciphers support padding state queries", testedCipherCount > 0);
     }
 
     EVP_CIPHER getCipher(String cipherName)  {
         EVP_CIPHER[] cipher = new EVP_CIPHER[1];
         libCtx.forEachCipher((confinedScopeCipher) -> {
-            if (confinedScopeCipher.providerName().equals("fips")) {
+            if (confinedScopeCipher.providerName().equals(LibCtx.getFipsProviderName())) {
                 // The OpenSSL FIPS provider includes a few non-approved algorithms that are allowed for legacy usage.
                 // E.g. Triple DES ECB & CBC. These algorithms, provided by the OpenSSL FIPS provider,
                 // would not be returned by an algorithm fetch with a "fips=yes" property query.

@@ -127,7 +127,12 @@ public class EvpKdfVectorTest extends EvpTest {
         OSSL_PARAM iterParam = OSSL_PARAM.ofUnsigned(EVP_KDF.KDF_PARAM_ITER, this.iterationCount);
         OSSL_PARAM dgstParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_DIGEST, this.mdAlg);
         OSSL_PARAM passParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PASSWORD, Util.utf8Encode(this.password));
-        this.kdfParams = this.openSsl.dataParamBuffer(this.testArena, passParam, saltParam, iterParam, dgstParam);
+        if (this.kdfAlg.equals(EVP_KDF.KDF_NAME_PBKDF2)) {
+            OSSL_PARAM pkcs5Param = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PKCS5, 0);
+            this.kdfParams = this.openSsl.dataParamBuffer(this.testArena, passParam, saltParam, iterParam, dgstParam, pkcs5Param);
+        } else {
+            this.kdfParams = this.openSsl.dataParamBuffer(this.testArena, passParam, saltParam, iterParam, dgstParam);
+        }
     }
 
     @Test
@@ -135,7 +140,7 @@ public class EvpKdfVectorTest extends EvpTest {
         assertTrue(kdf.isA(kdfAlg));
         assertEquals(kdfAlg, kdf.name());
         if (!this.kdfAlg.equals(EVP_KDF.KDF_NAME_PKCS12)) {
-            assertEquals("fips", kdf.providerName());
+            assertEquals(LibCtx.getFipsProviderName(), kdf.providerName());
         }
     }
 

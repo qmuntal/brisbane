@@ -159,4 +159,20 @@ public class OsslLocator {
             return readFipsModuleMacFromFile();
         }
     }
+
+    /**
+     * Get the OpenSSL FIPS provider name.
+     * @return the OpenSSL FIPS provider name
+     */
+    public static String getFipsProviderName() {
+        if (ToolkitProperties.getOpenSSLUseOsInstanceValue()) {
+            if (THIS_PLATFORM instanceof Platform.Linux) {
+                return fromLinuxDistro(LinuxDistro::getFipsProviderName);
+            }
+            throw new ProviderException("Use of operating system provided instance of OpenSSL " +
+                    "is not supported for platform " + THIS_PLATFORM);
+        } else {
+            return "fips";
+        }
+    }
 }

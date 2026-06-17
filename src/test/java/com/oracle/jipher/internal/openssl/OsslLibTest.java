@@ -285,7 +285,7 @@ public class OsslLibTest {
     // This test tests calling libCtx.newEvpRandCtx without specifying an arena and thus defaulting to an ofAuto arena
     @Test
     public void newRandCtxOfAuto() {
-        EVP_RAND rand = libCtx.fetchRand(EVP_RAND.RAND_NAME_HASH_DRBG, null, testArena);
+        EVP_RAND rand = libCtx.fetchRand(getSupportedRandName(), null, testArena);
         assertNotNull(libCtx.newEvpRandCtxWithPrimaryAsParent(rand));
     }
 
@@ -326,10 +326,24 @@ public class OsslLibTest {
 
     @Test
     public void fetchRandOfAuto() {
-        String name = EVP_RAND.RAND_NAME_HASH_DRBG;
+        String name = getSupportedRandName();
         EVP_RAND rand = libCtx.fetchRand(name, null);
         assertNotNull(rand);
         assertEquals(name, rand.name());
+    }
+
+    String getSupportedRandName() {
+        for (String name : new String[] {EVP_RAND.RAND_NAME_HASH_DRBG, EVP_RAND.RAND_NAME_CTR_DRBG}) {
+            try {
+                EVP_RAND rand = libCtx.fetchRand(name, null, testArena);
+                if (rand.providerName().equals(LibCtx.getFipsProviderName())) {
+                    return name;
+                }
+            } catch (OpenSslException e) {
+                // Try the next RAND.
+            }
+        }
+        throw new AssertionError("No supported RAND found");
     }
 
     // Negative tests

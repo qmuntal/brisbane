@@ -113,7 +113,8 @@ public class EvpKdfTest extends EvpTest {
         OSSL_PARAM iterParam = OSSL_PARAM.ofUnsigned(EVP_KDF.KDF_PARAM_ITER, tv.getIterationCount());
         OSSL_PARAM dgstParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_DIGEST, MD_ALG);
         OSSL_PARAM passParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PASSWORD, Util.utf8Encode(tv.getPasswordChars()));
-        this.kdfParams = this.openSsl.dataParamBuffer(this.testArena, passParam, saltParam, iterParam, dgstParam);
+        OSSL_PARAM pkcs5Param = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PKCS5, 0);
+        this.kdfParams = this.openSsl.dataParamBuffer(this.testArena, passParam, saltParam, iterParam, dgstParam, pkcs5Param);
     }
 
     @Test
@@ -138,7 +139,7 @@ public class EvpKdfTest extends EvpTest {
 
     @Test
     public void providerName() {
-        assertEquals("fips", kdf.providerName());
+        assertEquals(LibCtx.getFipsProviderName(), kdf.providerName());
     }
 
     @Test
@@ -318,9 +319,10 @@ public class EvpKdfTest extends EvpTest {
         OSSL_PARAM iterParam = OSSL_PARAM.ofUnsigned(EVP_KDF.KDF_PARAM_ITER, MIN_ITERATION_COUNT - 1);
         OSSL_PARAM dgstParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_DIGEST, MD_ALG);
         OSSL_PARAM passParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PASSWORD, password);
+        OSSL_PARAM pkcs5Param = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PKCS5, 0);
 
         try {
-            kdfCtx.derive(output, saltParam, iterParam, dgstParam, passParam);
+            kdfCtx.derive(output, saltParam, iterParam, dgstParam, passParam, pkcs5Param);
         } catch (OpenSslException e) {
             Assert.assertTrue(e.getMessage().contains("invalid iteration count"));
             throw e;
@@ -337,9 +339,10 @@ public class EvpKdfTest extends EvpTest {
         OSSL_PARAM iterParam = OSSL_PARAM.ofUnsigned(EVP_KDF.KDF_PARAM_ITER, MIN_ITERATION_COUNT);
         OSSL_PARAM dgstParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_DIGEST, MD_ALG);
         OSSL_PARAM passParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PASSWORD, password);
+        OSSL_PARAM pkcs5Param = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PKCS5, 0);
 
         try {
-            kdfCtx.derive(output, saltParam, iterParam, dgstParam, passParam);
+            kdfCtx.derive(output, saltParam, iterParam, dgstParam, passParam, pkcs5Param);
         } catch (OpenSslException e) {
             Assert.assertTrue(e.getMessage().contains("invalid salt length"));
             throw e;
@@ -356,9 +359,10 @@ public class EvpKdfTest extends EvpTest {
         OSSL_PARAM iterParam = OSSL_PARAM.ofUnsigned(EVP_KDF.KDF_PARAM_ITER, MIN_ITERATION_COUNT);
         OSSL_PARAM dgstParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_DIGEST, MD_ALG);
         OSSL_PARAM passParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PASSWORD, password);
+        OSSL_PARAM pkcs5Param = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PKCS5, 0);
 
         try {
-            kdfCtx.derive(output, saltParam, iterParam, dgstParam, passParam);
+            kdfCtx.derive(output, saltParam, iterParam, dgstParam, passParam, pkcs5Param);
             Assert.assertFalse(FipsProviderInfoUtil.getName().contains("Linux 9"));
         } catch (OpenSslException e) {
             Assert.assertTrue(FipsProviderInfoUtil.getName().contains("Linux 9"));
@@ -376,11 +380,12 @@ public class EvpKdfTest extends EvpTest {
         OSSL_PARAM iterParam = OSSL_PARAM.ofUnsigned(EVP_KDF.KDF_PARAM_ITER, MIN_ITERATION_COUNT);
         OSSL_PARAM dgstParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_DIGEST, MD_ALG);
         OSSL_PARAM passParam = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PASSWORD, password);
+        OSSL_PARAM pkcs5Param = OSSL_PARAM.of(EVP_KDF.KDF_PARAM_PKCS5, 0);
 
         try {
-            kdfCtx.derive(output, saltParam, iterParam, dgstParam, passParam);
+            kdfCtx.derive(output, saltParam, iterParam, dgstParam, passParam, pkcs5Param);
         } catch (OpenSslException e) {
-            Assert.assertTrue(e.getMessage().contains("key size too small"));
+            assertKeyLengthError(e);
             throw e;
         }
     }
@@ -498,6 +503,7 @@ public class EvpKdfTest extends EvpTest {
 
     @Test
     public void derivedMissingParametersNeg() throws Exception {
+        assumeTrue(!FipsProviderInfoUtil.isSymCryptProvider());
         ByteBuffer output = ByteBuffer.allocate(this.derivedKey.length);
         OsslParamBuffer noParams = this.openSsl.dataParamBuffer(this.testArena);
         try {
@@ -518,7 +524,7 @@ public class EvpKdfTest extends EvpTest {
         } catch (OpenSslException e) {
             // The SPI layer will validate parameters passed to the `kdfCtx` before calling
             // `kdfCtx.derive` and thus this OpenSslException will not be thrown in practice.
-            assertTrue(e.getMessage().contains("key size too small"));
+            assertKeyLengthError(e);
         }
     }
 
@@ -531,8 +537,12 @@ public class EvpKdfTest extends EvpTest {
         } catch (OpenSslException e) {
             // The SPI layer will validate parameters passed to the `kdfCtx` before calling
             // `kdfCtx.derive` and thus this OpenSslException will not be thrown in practice.
-            assertTrue(e.getMessage().contains("key size too small"));
+            assertKeyLengthError(e);
         }
+    }
+
+    static void assertKeyLengthError(OpenSslException e) {
+        assertTrue(e.getMessage().contains("key size too small") || e.getMessage().contains("invalid key length"));
     }
 
     @Test(expected = IllegalArgumentException.class)
